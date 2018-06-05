@@ -217,14 +217,17 @@ phases::ID Driver::getFinalPhase(const DerivedArgList &DAL,
   phases::ID FinalPhase;
 
   // -{E,EP,P,M,MM} only run the preprocessor.
-  if (CCCIsCPP() || (PhaseArg = DAL.getLastArg(options::OPT_E)) ||
+  // Do not use the clang preprocessor in fortran mode with -E
+  if (CCCIsCPP() || (!IsFortranMode() &&
+      (PhaseArg = DAL.getLastArg(options::OPT_E))) ||
       (PhaseArg = DAL.getLastArg(options::OPT__SLASH_EP)) ||
       (PhaseArg = DAL.getLastArg(options::OPT_M, options::OPT_MM)) ||
       (PhaseArg = DAL.getLastArg(options::OPT__SLASH_P))) {
     FinalPhase = phases::Preprocess;
 
-    // -fsyntax-only stops Fortran compilation after FortranFrontend
-  } else if (IsFortranMode() && (PhaseArg = DAL.getLastArg(options::OPT_fsyntax_only))) {
+    // -fsyntax-only or -E stops Fortran compilation after FortranFrontend
+  } else if (IsFortranMode() && ((PhaseArg = DAL.getLastArg(options::OPT_fsyntax_only)) ||
+    (PhaseArg = DAL.getLastArg(options::OPT_E)))) {
     FinalPhase = phases::FortranFrontend;
 
     // --precompile only runs up to precompilation.
