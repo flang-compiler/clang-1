@@ -613,10 +613,27 @@ void FlangFrontend::ConstructJob(Compilation &C, const JobAction &JA,
   // Enable preprocessor
   if (Args.hasArg(options::OPT_Mpreprocess) ||
       Args.hasArg(options::OPT_cpp) ||
+      Args.hasArg(options::OPT_E) ||
       types::getPreprocessedType(InputType) != types::TY_INVALID) {
     UpperCmdArgs.push_back("-preprocess");
+    /* Do not consume -E flag as it is consumed later*/ 
     for (auto Arg : Args.filtered(options::OPT_Mpreprocess, options::OPT_cpp)) {
       Arg->claim();
+    }
+  }
+
+  /*
+    When the -E option is provided, run only the fortran preprocessor.
+    Only in -E mode, consume -P if it exists
+  */
+  if (Args.hasArg(options::OPT_E)) {
+    UpperCmdArgs.push_back("-es");
+    Args.ClaimAllArgs(options::OPT_E);
+    if (Args.hasArg(options::OPT_P)) {
+      Args.ClaimAllArgs(options::OPT_P);
+    } else {
+      /* -pp enables line marker mode in flang1 */
+      UpperCmdArgs.push_back("-pp");
     }
   }
 
@@ -760,8 +777,9 @@ void FlangFrontend::ConstructJob(Compilation &C, const JobAction &JA,
 
   C.addCommand(llvm::make_unique<Command>(JA, *this, UpperExec, UpperCmdArgs, Inputs));
 
-  // For -fsyntax-only that is it
-  if (Args.hasArg(options::OPT_fsyntax_only)) return;
+  // For -fsyntax-only or -E that is it
+  if (Args.hasArg(options::OPT_fsyntax_only) ||
+      Args.hasArg(options::OPT_E)) return;
 
   /***** Lower part of Fortran frontend *****/
 
