@@ -783,13 +783,16 @@ void ToolChain::AddFortranStdlibLibArgs(const ArgList &Args,
   if (staticFlangLibs) {
     CmdArgs.push_back("-Bstatic");
   }
-  CmdArgs.push_back("-lflang");
-  CmdArgs.push_back("-lflangrti");
-  CmdArgs.push_back("-lpgmath");
   if( useOpenMP ) {
+    CmdArgs.push_back("-lflang-omp");
+    CmdArgs.push_back("-lflangrti-omp");
+    CmdArgs.push_back("-lpgmath");
     CmdArgs.push_back("-lomp");
   }
   else {
+    CmdArgs.push_back("-lflang");
+    CmdArgs.push_back("-lflangrti");
+    CmdArgs.push_back("-lpgmath");
     CmdArgs.push_back("-lompstub");
   }
   if( staticFlangLibs ) {
