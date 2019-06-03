@@ -326,7 +326,7 @@ void visualstudio::Linker::ConstructJob(Compilation &C, const JobAction &JA,
         Args.MakeArgString(std::string("-out:") + Output.getFilename()));
 
   if (!Args.hasArg(options::OPT_nostdlib, options::OPT_nostartfiles) &&
-      !C.getDriver().IsCLMode())
+      !C.getDriver().IsCLMode() && !C.getDriver().IsFortranMode())
     CmdArgs.push_back("-defaultlib:libcmt");
 
   if (!llvm::sys::Process::GetEnv("LIB")) {
@@ -424,6 +424,11 @@ void visualstudio::Linker::ConstructJob(Compilation &C, const JobAction &JA,
       // Already diagnosed.
       break;
     }
+  }
+
+  if (C.getDriver().IsFortranMode()) {
+    CmdArgs.push_back(Args.MakeArgString(std::string("-libpath:") +
+                                         TC.getDriver().Dir + "/../lib"));
   }
 
   // Add compiler-rt lib in case if it was explicitly
@@ -734,6 +739,85 @@ bool MSVCToolChain::isPICDefaultForced() const {
 void MSVCToolChain::AddCudaIncludeArgs(const ArgList &DriverArgs,
                                        ArgStringList &CC1Args) const {
   CudaInstallation.AddCudaIncludeArgs(DriverArgs, CC1Args);
+}
+
+
+void MSVCToolChain::AddFortranStdlibLibArgs(const ArgList &Args,
+                                    ArgStringList &CmdArgs) const {
+ bool staticFlangLibs = false;
+ bool useOpenMP = false;
+
+  if (Args.hasArg(options::OPT_staticFlangLibs)) {
+    for (auto *A: Args.filtered(options::OPT_staticFlangLibs)) {
+      A->claim();
+      staticFlangLibs = true;
+    }
+  }
+
+  Arg *A = Args.getLastArg(options::OPT_mp, options::OPT_nomp,
+                           options::OPT_fopenmp, options::OPT_fno_openmp);
+  if (A &&
+      (A->getOption().matches(options::OPT_mp) ||
+       A->getOption().matches(options::OPT_fopenmp))) {
+      useOpenMP = true;
+  }
+
+  if (needFortranMain(getDriver(), Args)) {
+    // flangmain is always static
+    CmdArgs.push_back("-linker");
+    CmdArgs.push_back("/subsystem:console");
+    CmdArgs.push_back("-linker");
+    CmdArgs.push_back("/defaultlib:flangmain.lib");
+  }
+
+  if (staticFlangLibs) {
+    CmdArgs.push_back("-linker");
+    CmdArgs.push_back("/defaultlib:libflang.lib");
+    CmdArgs.push_back("-linker");
+    CmdArgs.push_back("/defaultlib:libflangrti.lib");
+    CmdArgs.push_back("-linker");
+    CmdArgs.push_back("/defaultlib:libpgmath.lib");
+  } else {
+    CmdArgs.push_back("-linker");
+    CmdArgs.push_back("/defaultlib:flang.lib");
+    CmdArgs.push_back("-linker");
+    CmdArgs.push_back("/defaultlib:flangrti.lib");
+    CmdArgs.push_back("-linker");
+    CmdArgs.push_back("/defaultlib:pgmath.lib");
+  }
+  if (useOpenMP) {
+    CmdArgs.push_back("-linker");
+    CmdArgs.push_back("/nodefaultlib:vcomp.lib");
+    CmdArgs.push_back("-linker");
+    CmdArgs.push_back("/nodefaultlib:vcompd.lib");
+    CmdArgs.push_back("-linker");
+    CmdArgs.push_back("/defaultlib:libomp.lib");
+  }
+  else {
+    if (staticFlangLibs) {
+      CmdArgs.push_back("-linker");
+      CmdArgs.push_back("/defaultlib:libompstub.lib");
+    } else {
+      CmdArgs.push_back("-linker");
+      CmdArgs.push_back("/defaultlib:ompstub.lib");
+    }
+  }
+
+  // Allways link Fortran executables with Pthreads
+  // CmdArgs.push_back("-lpthread");
+
+  // These options are added clang-cl in Clang.cpp for C/C++
+  // In clang-cl.exe -MD and -MT control these options, but in
+  // flang.exe like clang.exe these are different options for
+  // dependency tracking. Let's assume that if somebody needs
+  // static flang libs, they need static runtime libs as well.
+  if (staticFlangLibs) {
+    CmdArgs.push_back("-linker");
+    CmdArgs.push_back("/defaultlib:libcmt.lib");
+  } else {
+    CmdArgs.push_back("-linker");
+    CmdArgs.push_back("/defaultlib:msvcrt.lib");
+  }
 }
 
 void MSVCToolChain::printVerboseInfo(raw_ostream &OS) const {

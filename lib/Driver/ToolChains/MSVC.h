@@ -109,6 +109,9 @@ public:
   void AddCudaIncludeArgs(const llvm::opt::ArgList &DriverArgs,
                           llvm::opt::ArgStringList &CC1Args) const override;
 
+  void AddFortranStdlibLibArgs(const llvm::opt::ArgList &Args,
+                               llvm::opt::ArgStringList &CmdArgs) const override;
+
   bool getWindowsSDKLibraryPath(std::string &path) const;
   /// \brief Check if Universal CRT should be used if available
   bool getUniversalCRTLibraryPath(std::string &path) const;
