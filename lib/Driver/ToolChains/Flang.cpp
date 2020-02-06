@@ -352,6 +352,22 @@ void FlangFrontend::ConstructJob(Compilation &C, const JobAction &JA,
     CommonCmdArgs.push_back("0x4000");
   }
 
+  // -gdwarf-4
+  for (auto Arg : Args.filtered(options::OPT_gdwarf_4)) {
+    Arg->claim();
+    CommonCmdArgs.push_back("-x");
+    CommonCmdArgs.push_back("120");
+    CommonCmdArgs.push_back("0x1000000");
+  }
+
+  // -gdwarf-5
+  for (auto Arg : Args.filtered(options::OPT_gdwarf_5)) {
+    Arg->claim();
+    CommonCmdArgs.push_back("-x");
+    CommonCmdArgs.push_back("120");
+    CommonCmdArgs.push_back("0x2000000");
+  }
+
   // -Mipa has no effect
   if (Arg *A = Args.getLastArg(options::OPT_Mipa)) {
     getToolChain().getDriver().Diag(diag::warn_drv_clang_unsupported)
