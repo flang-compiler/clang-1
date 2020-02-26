@@ -312,7 +312,7 @@ void FlangFrontend::ConstructJob(Compilation &C, const JobAction &JA,
     CommonCmdArgs.push_back("-x");
     CommonCmdArgs.push_back("120");
 
-    if (!GDwarfArg) // -g should produce default (DWARFv4)
+    if (!GDwarfArg) // -g without -gdwarf-X produces default (DWARFv4)
       CommonCmdArgs.push_back("0x1000000");
     else if (GDwarfArg->getOption().matches(options::OPT_gdwarf_2)) // -gdwarf-2
       CommonCmdArgs.push_back("0x200");
