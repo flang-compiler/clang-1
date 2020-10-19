@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [ release_90 ]
+  schedule:
+    # Github only holds artifacts for 90 days, so run the job also
+    # at 02:00 on day-of-month 1 in every 2nd month from January through December.
+    - cron: '0 2 1 1/2 *'
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        target: [X86, AArch64, PowerPC]
+
+    steps:
+      - name: Check tools
+        run: |
+          git --version
+          cmake --version
+          make --version
+          gcc --version
+
+      - name: Download llvm
+        run: |
+          cd ../..
+          # First get the list of artifacts from the most recent run.
+          wget --output-document artifacts_llvm `curl -sL https://api.github.com/repos/flang-compiler/llvm/actions/workflows/build_llvm.yml/runs | jq -r '.workflow_runs[0].artifacts_url?'`
+          
+          echo "cat artifacts_llvm"
+          cat artifacts_llvm
+      
+          url=`jq -r '.artifacts[] | select(.name == "llvm_build_${{ matrix.target }}") | .archive_download_url' artifacts_llvm`
+          wget --output-document llvm_build.zip --header="Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" $url
+          
+      - name: Install llvm
+        run: |
+          cd ../..
+          # Don't clone nor build - use the prepackaged sources and prebuilt build directory
+          unzip llvm_build.zip
+          tar xzf llvm_build.tar.gz
+          cd llvm/build
+          sudo make install/fast
+          llvm-config --version # Try if the installation was successful
+
+      - name: Build flang-driver
+        run: |
+          cd ../..
+          # clone manually to have paths fixed to /home/runner/work
+          rm -rf flang-driver
+          git clone --depth 1 --single-branch --branch release_90 https://github.com/flang-compiler/flang-driver.git
+          cd flang-driver
+          # After build place the artifacts in flang-driver/flang-driver, so Upload can find them.
+          mkdir flang-driver
+          CMAKE_OPTIONS="-DLLVM_TARGETS_TO_BUILD=${{ matrix.target }}\
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=/usr/bin/gcc-9 \
+            -DCMAKE_CXX_COMPILER=/usr/bin/g++-9"
+          mkdir -p build && cd build
+          cmake $CMAKE_OPTIONS ..
+          make -j$(nproc)
+          
+          # Archive the build directory for future installation
+          cd ../..
+          tar -zcf flang-driver_build.tar.gz flang-driver
+          mv flang-driver_build.tar.gz flang-driver/flang-driver/.
+      
+      - name: Upload flang-driver
+        uses: actions/upload-artifact@v2
+        with:
+          name: flang-driver_build_${{ matrix.target }}
+          path: flang-driver_build.tar.gz
