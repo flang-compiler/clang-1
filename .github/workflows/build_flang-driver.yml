@@ -5,8 +5,8 @@ on:
     branches: [ release_90 ]
   schedule:
     # Github only holds artifacts for 90 days, so run the job also
-    # at 02:00 on day-of-month 1 in every 2nd month from January through December.
-    - cron: '0 2 1 1/2 *'
+    # at 02:00 on day-of-month 1 of every month.
+    - cron: '0 2 1 * *'
 
 jobs:
   build:
